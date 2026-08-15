@@ -13,8 +13,12 @@ import { resolveWeek, wState } from "../lib/helpers.js";
 import { planBForWeek } from "../lib/planB.js";
 import PlanBCard from "./PlanBCard.jsx";
 import WeekCourses from "./WeekCourses.jsx";
+import SlotSwap from "./SlotSwap.jsx";
+import CourseDiagram from "./CourseDiagram.jsx";
+import { displaySlots, printableActivities, SLOT_LABELS } from "../lib/weekEdits.js";
+import { kitSummary } from "../lib/courses.js";
 
-export default function SessionDetail({ r, blockWeek, st, players, back, toggleDone, setReflection, data, recordObservation, setAttendance, toggleAttendance, saveCustom, deleteCustom, attachCustom, detachCustom, setPlanB, attachCourse, detachCourse }) {
+export default function SessionDetail({ r, blockWeek, st, players, back, toggleDone, setReflection, data, recordObservation, setAttendance, toggleAttendance, saveCustom, deleteCustom, attachCustom, detachCustom, setPlanB, attachCourse, detachCourse, setWeekSlot }) {
   const { skill, skillId, w, session } = r;
   const count = data ? headcount(data, blockWeek) : (players || []).length;
   const slotKey = `${skillId}:${session}`;
@@ -27,10 +31,11 @@ export default function SessionDetail({ r, blockWeek, st, players, back, toggleD
   const planB = data && !isOwn && planBConds.length
     ? planBForWeek(skill, session - 1, planBConds.filter((c) => c !== "numbers"), count)
     : null;
-  const baseTrio = planB
-    ? planB.slots.map((s) => (s.keep || !s.replacement ? s.original : s.replacement))
-    : w.activities;
-  const activities = data && !isOwn ? activitiesForSlot(data, skillId, session, baseTrio) : baseTrio;
+  // Each slot in precedence order: your swap, then Plan B's substitute, then
+  // the plan. Attached extras from your library follow the three slots.
+  const slots = data ? displaySlots(data, blockWeek, w.activities, planB) : w.activities.map((a, i) => ({ i, activity: a }));
+  const extras = data && !isOwn ? activitiesForSlot(data, skillId, session, []) : [];
+  const overriddenSlots = slots.filter((v) => v.overridden).map((v) => v.i);
 
   // Debrief recall: the note left the previous time this skill was coached.
   const lastTime = data && data.plan && !isOwn
@@ -108,7 +113,8 @@ export default function SessionDetail({ r, blockWeek, st, players, back, toggleD
 
       {data && !isOwn && setPlanB && (
         <PlanBCard skill={skill} count={count} conds={planBConds}
-          setConds={(c) => setPlanB(blockWeek, c)} plan={planB} />
+          setConds={(c) => setPlanB(blockWeek, c)} plan={planB}
+          overriddenSlots={overriddenSlots} />
       )}
 
       {lastTime && (
@@ -119,20 +125,47 @@ export default function SessionDetail({ r, blockWeek, st, players, back, toggleD
       )}
 
       <Label className="px-1">Activities</Label>
-      {activities.map((a, i) => {
-        const s = planB ? planB.slots.find((x) => !x.keep && x.replacement === a) : null;
+      {slots.map((v) => {
+        const s = !v.overridden && v.planBSlot && !v.planBSlot.keep && v.planBSlot.replacement ? v.planBSlot : null;
         return (
-          <div key={a.id || i}>
+          <div key={v.i}>
+            {data && setWeekSlot && (
+              <SlotSwap data={data} slotIndex={v.i} slotLabel={SLOT_LABELS[v.i]}
+                skillId={skillId} session={session} isOwn={isOwn}
+                current={v.ref || null}
+                setRef={(ref) => setWeekSlot(blockWeek, v.i, ref)} />
+            )}
             {s && (
               <div className="rounded-xl px-3 py-2 mb-1 text-xs font-bold"
                 style={{ background: C.goldSoft, color: "#7a4f00" }}>
                 Plan B swap · runs instead of “{s.original.name}” · borrowed from week {s.fromWeek}
               </div>
             )}
-            <ActivityCard a={a} count={count} />
+            {v.course ? (
+              <Card style={{ borderColor: C.grass, borderWidth: 2 }}><div className="p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-bold">{v.course.name || "Untitled course"}</div>
+                  <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
+                    style={{ background: C.grassSoft, color: C.pine }}>🏟 Skills course</span>
+                </div>
+                <div className="text-xs mt-0.5" style={{ color: C.mute }}>
+                  {v.course.size[0]}m × {v.course.size[1]}m{kitSummary(v.course) ? ` · ${kitSummary(v.course)}` : ""}
+                </div>
+                <CourseDiagram course={v.course} />
+                {v.course.notes && (
+                  <div className="rounded-xl p-2.5 mt-2" style={{ background: C.paper, border: `1px solid ${C.line}` }}>
+                    <Label>How it runs</Label>
+                    <p className="text-sm mt-1">{v.course.notes}</p>
+                  </div>
+                )}
+              </div></Card>
+            ) : (
+              <ActivityCard a={v.activity} count={count} />
+            )}
           </div>
         );
       })}
+      {extras.map((a, i) => <ActivityCard key={a.id || "x" + i} a={a} count={count} />)}
 
       {data && attachCourse && (
         <WeekCourses data={data} week={blockWeek}
@@ -166,7 +199,17 @@ export default function SessionDetail({ r, blockWeek, st, players, back, toggleD
         {st.done ? "✓ Session delivered — tap to undo" : "Mark session as delivered"}
       </button>
 
-      <button onClick={() => printSession(blockWeek, r, players)}
+      <button onClick={() => {
+          const slotCourses = slots.filter((v) => v.course).map((v) => v.course);
+          const slotIds = slotCourses.map((c) => c.id);
+          const added = ((data && data.weekCourses && data.weekCourses[blockWeek]) || [])
+            .filter((id) => !slotIds.includes(id))
+            .map((id) => (data.courses || []).find((c) => c.id === id))
+            .filter(Boolean);
+          printSession(blockWeek,
+            { ...r, w: { ...w, activities: printableActivities(slots, extras) } },
+            players, [...slotCourses, ...added]);
+        }}
         className="w-full rounded-xl py-3 font-bold flex items-center justify-center gap-2"
         style={{ background: "#fff", color: C.pine, border: `1px solid ${C.line}` }}>
         🖨️ Print this session (Save as PDF)
