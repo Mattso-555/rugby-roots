@@ -13,6 +13,7 @@ import React, { useEffect, useState } from "react";
 import { C } from "../data/constants.js";
 import { Card, Label, Pill } from "./ui.jsx";
 import { supabase, signOut } from "../lib/supabaseClient.js";
+import { syncNowManual } from "../lib/storage.js";
 import { copyText } from "../lib/share.js";
 
 export function ParentLinkCard({ player }) {
@@ -166,10 +167,17 @@ export function CoachesCard({ syncStatus }) {
         </button>
       </div>
       {msg && <p className="text-sm mt-2" style={{ color: C.mute }}>{msg}</p>}
-      <button onClick={async () => { await signOut(); window.location.reload(); }}
-        className="mt-4 text-sm font-bold" style={{ color: "#B3401F" }}>
-        Sign out on this device
-      </button>
+      <div className="flex items-center justify-between mt-4">
+        <button onClick={() => syncNowManual()}
+          className="rounded-xl px-4 py-2.5 text-sm font-bold"
+          style={{ background: C.grassSoft, color: C.pine }}>
+          ⟳ Sync now
+        </button>
+        <button onClick={async () => { await signOut(); window.location.reload(); }}
+          className="text-sm font-bold" style={{ color: "#B3401F" }}>
+          Sign out on this device
+        </button>
+      </div>
     </div></Card>
   );
 }
