@@ -27,6 +27,27 @@ export async function signInWithEmail(email) {
   if (error) throw error;
 }
 
+// Verify the 6-digit code from the sign-in email — immune to link-scanning
+// mail providers and to "which device did I open it on" confusion.
+export async function verifyEmailCode(email, code) {
+  const { error } = await supabase().auth.verifyOtp({
+    email, token: code.trim(), type: "email",
+  });
+  if (error) throw error;
+}
+
+// Optional quick sign-in: a coach who has set a password skips email
+// entirely on new devices.
+export async function signInWithPassword(email, password) {
+  const { error } = await supabase().auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+export async function setPassword(password) {
+  const { error } = await supabase().auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function getSession() {
   const { data } = await supabase().auth.getSession();
   return data.session || null;
