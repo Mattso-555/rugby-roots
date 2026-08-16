@@ -210,6 +210,9 @@ export async function saveData(data) {
   return ok;
 }
 
+// A visible "Sync now" for coaches who want certainty right now.
+export function syncNowManual() { return syncNow(); }
+
 // App subscribes to hear when another coach's changes have been merged in.
 export function onRemoteChange(cb) { remoteCb = cb; }
 export function onSyncStatus(cb) { statusCb = cb; if (!cloudEnabled()) cb("local"); }

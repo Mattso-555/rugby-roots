@@ -128,13 +128,27 @@ function mergePlayers(local, remote) {
   return out;
 }
 
+// A remote value that is essentially "nothing" must never replace real local
+// content — this protects a phone carrying a real season from a club store
+// that was seeded empty moments earlier by a fresh device.
+function isEmptyish(name, v) {
+  if (v == null) return true;
+  if (name === "plan") return !v.slots || !v.slots.length;
+  if (name === "team") return !v.ageGrade;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === "object") return Object.keys(v).length === 0;
+  return false;
+}
+
 // --- the section merge ------------------------------------------------------
 // `localDirty` = this device edited the section since it last pushed.
 export function mergeSection(name, local, remote, localDirty) {
   if (remote === undefined || remote === null) return local;
   if (name === "players") return mergePlayers(local, remote);
   if (WEEK_KEYED.includes(name)) return mergeWeekMap(local, remote, localDirty);
-  // team / plan / libraries / extras: whole-section, edited side wins
+  // team / plan / libraries / extras: whole-section, edited side wins —
+  // but nothing never beats something.
+  if (isEmptyish(name, remote) && !isEmptyish(name, local)) return local;
   return localDirty ? local : remote;
 }
 
