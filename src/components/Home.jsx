@@ -9,7 +9,7 @@ import AgeGradeCard from "./AgeGradeCard.jsx";
 import BackupCard from "./BackupCard.jsx";
 import { clearData } from "../lib/storage.js";
 import { cloudEnabled } from "../lib/supabaseClient.js";
-import { CoachesCard } from "./CloudCards.jsx";
+import { CoachesCard, QuickSignInCard } from "./CloudCards.jsx";
 
 const SECTIONS = [
   { tab: "today",    emoji: "🏠", title: "Today",    text: "This week's session and your block at a glance." },
@@ -71,6 +71,7 @@ export default function Home({ data, ageGrade, setAgeGrade, onRestore, goTab, on
         <Label>Settings</Label>
         <div className="space-y-3 mt-2">
           {cloudEnabled() && <CoachesCard syncStatus={syncStatus} />}
+          {cloudEnabled() && <QuickSignInCard />}
           <AgeGradeCard ageGrade={ageGrade} setAgeGrade={setAgeGrade} />
           <BackupCard data={data} onRestore={onRestore} />
 

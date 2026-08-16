@@ -12,7 +12,7 @@
 import React, { useEffect, useState } from "react";
 import { C } from "../data/constants.js";
 import { Card, Label, Pill } from "./ui.jsx";
-import { supabase, signOut } from "../lib/supabaseClient.js";
+import { supabase, signOut, setPassword } from "../lib/supabaseClient.js";
 import { syncNowManual } from "../lib/storage.js";
 import { copyText } from "../lib/share.js";
 
@@ -178,6 +178,57 @@ export function CoachesCard({ syncStatus }) {
           Sign out on this device
         </button>
       </div>
+    </div></Card>
+  );
+}
+
+
+// Set (or change) the quick sign-in password for THIS coach's account.
+// After this, new devices need only email + password — no email arriving.
+export function QuickSignInCard() {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (pw.length < 8) { setMsg({ bad: true, text: "At least 8 characters." }); return; }
+    if (pw !== pw2) { setMsg({ bad: true, text: "The two boxes don't match." }); return; }
+    setBusy(true);
+    try {
+      await setPassword(pw);
+      setMsg({ bad: false, text: "Done. On any device: your email + this password, no email link needed." });
+      setPw(""); setPw2("");
+    } catch (e) {
+      setMsg({ bad: true, text: e.message || "Couldn't set it — try again." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card><div className="p-4">
+      <Label>Quick sign-in password</Label>
+      <p className="text-xs mt-1" style={{ color: C.mute }}>
+        Optional. Set a password and future sign-ins on any device are just
+        email + password — no waiting for an email. Don't reuse a password
+        from anywhere else.
+      </p>
+      <input value={pw} onChange={(e) => setPw(e.target.value)} type="password"
+        placeholder="New password (8+ characters)" autoComplete="new-password"
+        className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mt-2"
+        style={{ background: C.paper, border: `1px solid ${C.line}` }} />
+      <input value={pw2} onChange={(e) => setPw2(e.target.value)} type="password"
+        placeholder="Same again" autoComplete="new-password"
+        onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+        className="w-full rounded-xl px-3 py-2.5 text-sm outline-none mt-2"
+        style={{ background: C.paper, border: `1px solid ${C.line}` }} />
+      {msg && <p className="text-sm mt-2" style={{ color: msg.bad ? "#B3401F" : C.grass }}>{msg.text}</p>}
+      <button onClick={save} disabled={busy}
+        className="rounded-xl px-4 py-2.5 text-sm font-bold mt-2"
+        style={{ background: C.grass, color: "#fff" }}>
+        {busy ? "Saving…" : "Set password"}
+      </button>
     </div></Card>
   );
 }

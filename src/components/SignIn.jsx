@@ -5,13 +5,42 @@
 
 import React, { useState } from "react";
 import { C } from "../data/constants.js";
-import { signInWithEmail } from "../lib/supabaseClient.js";
+import { signInWithEmail, verifyEmailCode, signInWithPassword } from "../lib/supabaseClient.js";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState(null);
+  const [pw, setPw] = useState("");
+
+  const pwSignIn = async () => {
+    const e = email.trim().toLowerCase();
+    if (!e.includes("@")) { setError("Enter your email above first."); return; }
+    if (!pw) { setError("Type your password."); return; }
+    setBusy(true); setError(null);
+    try {
+      await signInWithPassword(e, pw);
+      // onAuthStateChange in App takes over
+    } catch {
+      setError("Email and password didn't match. Use the email link instead, then set a password in Home & settings.");
+      setBusy(false);
+    }
+  };
+
+  const verify = async () => {
+    if (code.trim().length < 6) { setCodeError("The code is 6 digits."); return; }
+    setBusy(true); setCodeError(null);
+    try {
+      await verifyEmailCode(email.trim().toLowerCase(), code);
+      // onAuthStateChange in App takes over from here
+    } catch {
+      setCodeError("That code didn't work — check it, or send a fresh email.");
+      setBusy(false);
+    }
+  };
 
   const send = async () => {
     const e = email.trim().toLowerCase();
@@ -63,6 +92,22 @@ export default function SignIn() {
                 style={{ background: busy ? C.paper : C.grass, color: busy ? C.mute : "#fff", fontSize: 16 }}>
                 {busy ? "Sending…" : "Email me a sign-in link"}
               </button>
+
+              <div className="flex items-center gap-3 mt-4">
+                <div style={{ flex: 1, height: 1, background: C.line }} />
+                <span className="text-xs font-bold" style={{ color: C.mute }}>OR, IF YOU'VE SET ONE</span>
+                <div style={{ flex: 1, height: 1, background: C.line }} />
+              </div>
+              <input value={pw} onChange={(e) => setPw(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") pwSignIn(); }}
+                type="password" placeholder="Your password" autoComplete="current-password"
+                style={{ width: "100%", background: C.paper, border: `1px solid ${C.line}`,
+                         borderRadius: 12, padding: "12px", fontSize: 16, marginTop: 10, outline: "none" }} />
+              <button onClick={pwSignIn} disabled={busy}
+                className="w-full rounded-xl py-3 font-bold mt-2"
+                style={{ background: "#fff", color: C.pine, border: `1px solid ${C.line}`, fontSize: 15 }}>
+                Sign in with password
+              </button>
             </>
           ) : (
             <>
@@ -70,12 +115,27 @@ export default function SignIn() {
                 Check your email 📬
               </div>
               <p className="text-sm mt-1" style={{ color: C.mute }}>
-                A sign-in link is on its way to <b>{email.trim()}</b>. Open it on
-                this device. If nothing arrives in a couple of minutes, check
-                spam — or your email may not be on the club's coach list yet:
-                ask whoever runs the club to add you.
+                An email is on its way to <b>{email.trim()}</b>. <b>Tap the
+                link in it on this device</b> and you're in. If your club's
+                emails include a 6-digit code, typing it below works too.
               </p>
-              <button onClick={() => setSent(false)} className="mt-3 text-sm font-bold" style={{ color: C.grass }}>
+              <input value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
+                onKeyDown={(e) => { if (e.key === "Enter") verify(); }}
+                inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={6}
+                style={{ width: "100%", background: C.paper, border: `1px solid ${C.line}`,
+                         borderRadius: 12, padding: "12px", fontSize: 22, letterSpacing: "0.35em",
+                         textAlign: "center", marginTop: 12, outline: "none" }} />
+              {codeError && <p className="text-sm mt-2" style={{ color: "#B3401F" }}>{codeError}</p>}
+              <button onClick={verify} disabled={busy}
+                className="w-full rounded-xl py-4 font-bold mt-3"
+                style={{ background: busy ? C.paper : C.grass, color: busy ? C.mute : "#fff", fontSize: 16 }}>
+                {busy ? "Checking…" : "Sign in with the code"}
+              </button>
+              <p className="text-xs mt-3" style={{ color: C.mute }}>
+                Nothing after a couple of minutes? Check spam — or your email may
+                not be on the club's coach list yet.
+              </p>
+              <button onClick={() => { setSent(false); setCode(""); }} className="mt-2 text-sm font-bold" style={{ color: C.grass }}>
                 Use a different email
               </button>
             </>
